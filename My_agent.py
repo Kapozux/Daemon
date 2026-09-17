@@ -1,5 +1,6 @@
 from openai import OpenAI
 from dotenv import load_dotenv
+from datetime import datetime
 import os
 import re
 import subprocess
@@ -7,7 +8,7 @@ import os
 
 
 
-
+curr_date = datetime.now().strftime("%Y_%m_%d_%H_%M_%s")
 
 
 
@@ -141,7 +142,7 @@ def save_chat(messages): #对聊天记录做导出
             temp += "\n"
             temp += "---"
             temp += "\n"
-    with open("agent_chat_history.md","w") as f:
+    with open("agent_chat_history"+curr_date+".md","w") as f:
         f.write(temp)
 
 
@@ -151,7 +152,11 @@ def parse_plan_finished(lm_output):
     else:
         return False
     
-
+def parse_plan_needed(lm_output):
+    if("plan-needed" in lm_output):
+        return True
+    elif("plan-unwanted" in lm_output):
+        return False
 
 
 
@@ -159,8 +164,7 @@ content_input = ""
 
 messages = [{
     "role": "system", 
-    "content": "你是一个代码编写的agent, 你需要根据用户的初步指令去完成目标，并且根据你代码出现的错误进行自我修正知道完成用户目标。如果你需要跑一个指令，请用以下方式包装（一次回答只给一个！）： ```bash-action\n<command>\n```. 如果你认为任务已经完成，请运行exit 指令（不要陷入死循环）。 记住，只做符合任务目的的一切行动，不许经过用户同意后擅自查看，修改，创建新文件。输出规范：不许使用md的语法。当程序运行成功且输出符合预期时，必须立即运行 exit 命令，不要再做额外的验证或优化。目前agent的步骤分为三个：1. listening stage 2. plan stage 3. Execution and correction stage Plan的时候只说计划，不给代码。 Plan的时候用户说ok，说确认才给finished.，没说的时候不可以给，不可以给计划的时候同时给finish"
-}]
+    "content": "你是一个代码编写的agent, 你需要根据用户的初步指令去是否选择计划而去完成目标，并且根据你代码出现的错误进行自我修正知道完成用户目标。如果你需要跑一个指令，请用以下方式包装（一次回答只给一个！）： ```bash-action\n<command>\n```. 如果你认为任务已经完成，请运行exit 指令（不要陷入死循环）。 记住，只做符合任务目的的一切行动，不许经过用户同意后擅自查看，修改，创建新文件。输出规范：不许使用md的语法。当程序运行成功且输出符合预期时，必须立即运行 exit 命令，不要再做额外的验证或优化。目前agent的步骤分为三个：1. listening stage 2. plan stage 3. Execution and correction stage  Plan的时候只说计划，不给代码。 Plan的时候用户说ok，说确认才给finished.，没说的时候不可以给，不可以给计划的时候同时给finish"}]
 
 if(os.path.exists("DAEMON.md")):
     with open("DAEMON.md","r") as f:
@@ -173,34 +177,46 @@ class OurTimeoutError(NonterminatingException): ...
 
 token_amount_temp = 0
 state_lm=True
-while True: #第一层循环，用户提要求，agent自己去试试试
+while True: #第一层循环，用户提要求
     content_input = input("请输入你的指令，纯语言就可以哈: ")
-    messages.append({"role": "user", "content": content_input+"请你先输出你根据这个代码的思路，目前不需要指令。第一轮不允许输出 plan-finish，(目前是Plan phase)"})
-    save_chat(messages)
 
-    cnt_plan=0
-    while True: # PLAN LOOP
-        token_amount_temp = 0
-        lm_output,token_amount_temp,state_lm = query_lm(messages) # 拿一个回答
-        messages.append({"role": "assistant", "content": lm_output})
-        if(parse_plan_finished(lm_output)):
-            messages.append({"role": "assistant", "content": "目前planning结束，开始执行你的代码吧"})
-            break
-        if(token_amount_temp>256000*0.8):
-            messages = compression(messages)
-            continue
-        if(state_lm == False):
-            print("有bug 崩了")
-            break
-        content_input = input("Planning:你看看当前计划如何，纯语言就可以哈: ")
-        messages.append({"role": "user", "content": content_input+"指令部分（不需要回复）：根据用户的完善进一步给出计划，如果用户认为当前计划可以执行，那你在你的下一步回答中要包括````plan-finish```` 以及当你输出 plan-finish 时，不要同时输出任何 bash-action 代码块。plan-finish 的回答只包含 plan-finish 标记本身。以及你绝对不能自行输出 plan-finish。只有当用户的消息中明确包含'确认'、'可以'、'ok'等同意词时，你才能在下一条回复中输出 plan-finish。否则你必须等待用户反馈。"})
-        if(cnt_plan>20):
-            print("Plan 崩了，回家咯，直接继续")
-            messages.append({"role": "assistant", "content": "目前planning结束（由于plan次数太多)，开始执行你的代码吧"})
-            break
-        cnt_plan+=1
+    routing_messages = [
+        {"role":"system","content":"你只需要判断用户的任务是否需要先做计划。回复只能是plan-needed 或 plan-unwanted 其中一个词。 不允许任何其他内容。 需要多步骤、写代码、创建文件的任务回复 plan-needed。查看文件、简单查询回复 plan-unwanted。"},
+        {"role":"user","content":content_input}
+    ]
+    lm_output, _, _ = query_lm(routing_messages) # 请求模型个旁枝看看要不要plan
 
+    # messages.append({"role": "user", "content": content_input+"你的回复只能包含 plan-needed 或 plan-unwanted 两个词之一，不允许输出任何其他内容"})
+    # save_chat(messages)
+    # lm_output,token_amount_temp,state_lm = query_lm(messages) # 拿第一个回答 看是否需要planning or not
+    needed = parse_plan_needed(lm_output)
+    if(needed):
+        messages.append({"role":"user","content":"我提的plan:"+content_input})
+        messages.append({"role": "assistant", "content": "目前planning 已经开启，请输出你的plan"})
 
+        cnt_plan=0
+        while True: # PLAN LOOP
+            token_amount_temp = 0
+            lm_output,token_amount_temp,state_lm = query_lm(messages) # 拿一个回答
+            messages.append({"role": "assistant", "content": lm_output})
+            if(parse_plan_finished(lm_output)):
+                break
+            if(token_amount_temp>256000*0.8):
+                messages = compression(messages)
+                continue
+            if(state_lm == False):
+                print("有bug 崩了")
+                break
+            content_input = input("Planning:你看看当前计划如何，纯语言就可以哈: ") #获得用户对plan对回答
+            messages.append({"role": "user", "content": content_input+"指令部分（不需要回复）：根据用户的完善进一步给出计划，如果用户认为当前计划可以执行，那你在你的下一步回答中要包括````plan-finish```` 以及当你输出 plan-finish 时，不要同时输出任何 bash-action 代码块。plan-finish 的回答只包含 plan-finish 标记本身。以及你绝对不能自行输出 plan-finish。只有当用户的消息中明确包含'确认'、'可以'、'ok'等同意词时，你才能在下一条回复中输出 plan-finish。否则你必须等待用户反馈。"})
+            if(cnt_plan>20):
+                print("Plan 崩了，回家咯，直接继续")
+                messages.append({"role": "assistant", "content": "目前planning结束（由于plan次数太多)，结束了"})
+                break
+            cnt_plan+=1
+    else:
+        messages.append({"role":"user","content":"我提的你要直接做的任务:"+content_input})
+    messages.append({"role": "assistant", "content": "开始执行你的代码吧"})
     cnt = 0
     while True:
         cnt+=1
