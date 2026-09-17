@@ -131,6 +131,9 @@ def compression(messages): # 压缩上下文（对message做处理
 # print(parse_action(test_output))
 
 
+os.makedirs("chat_history", exist_ok=True)
+
+
 def save_chat(messages): #对聊天记录做导出
     temp = ""
     for i in range(len(messages)):
@@ -142,7 +145,7 @@ def save_chat(messages): #对聊天记录做导出
             temp += "\n"
             temp += "---"
             temp += "\n"
-    with open("agent_chat_history"+curr_date+".md","w") as f:
+    with open("chat_history/agent_chat_history"+curr_date+".md","w") as f:
         f.write(temp)
 
 
@@ -177,6 +180,11 @@ class OurTimeoutError(NonterminatingException): ...
 
 token_amount_temp = 0
 state_lm=True
+
+
+
+
+# AGENT LOOP
 while True: #第一层循环，用户提要求
     content_input = input("请输入你的指令，纯语言就可以哈: ")
 
