@@ -51,7 +51,7 @@ def query_lm(messages,isCompression=False):
 
                 #token_amount = chunk.choices[0].usage["total_token"]
                 if(hasattr(chunk,"usage")and (chunk.usage is not None)):
-                    token_amount = chunk.choices[0].usage["total_token"]
+                    token_amount = chunk.usage.total_tokens
                 if hasattr(chunk.choices[0].delta,'reasoning_content') and chunk.choices[0].delta.reasoning_content: #如果在思考的话就输出....
                     print(".",end="",flush=True)
             if(isCompression==False):
@@ -104,7 +104,7 @@ def execute_action(command: str) -> str: #本地python -> bash执行指令
             errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            timeout=30,
+            timeout=120,
         )
         return result.stdout    
     except subprocess.TimeoutExpired as e:
