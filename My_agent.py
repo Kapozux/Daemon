@@ -1,6 +1,7 @@
 from openai import OpenAI
 from dotenv import load_dotenv
 from datetime import datetime
+import sys
 import os
 import re
 import subprocess
@@ -21,6 +22,11 @@ client = OpenAI(
     base_url="https://api.moonshot.cn/v1"
 )
 
+client_ds = OpenAI(
+    api_key=(os.environ["DEEPSEEK_API_KEY"]),
+    base_url="https://api.deepseek.com"
+)
+
 def query_lm(messages,isCompression=False):
     cnt = 1
     state = True
@@ -29,8 +35,8 @@ def query_lm(messages,isCompression=False):
     while True:
         try:
             
-            response = client.chat.completions.create(
-                model="kimi-k2.7-code",
+            response = client_ds.chat.completions.create(
+                model="deepseek-chat",
                 messages=messages,
                 stream = True
             )   
@@ -183,11 +189,26 @@ state_lm=True
 
 
 
+headless = False
+task_content = ""
+if len(sys.argv) > 1:
+    headless = True
+    with open(sys.argv[1],"r") as f:
+        task_content = f.read()
+
+
+
+
+
+
 
 # AGENT LOOP
 while True: #第一层循环，用户提要求
-    content_input = input("请输入你的指令，纯语言就可以哈: ")
-
+    # content_input = input("请输入你的指令，纯语言就可以哈: ")
+    if headless:
+        content_input = task_content
+    else:
+        content_input = input("请输入你的指令，纯语言就可以哈：")
     routing_messages = [
         {"role":"system","content":"你只需要判断用户的任务是否需要先做计划。回复只能是plan-needed 或 plan-unwanted 其中一个词。 不允许任何其他内容。 需要多步骤、写代码、创建文件的任务回复 plan-needed。查看文件、简单查询回复 plan-unwanted。"},
         {"role":"user","content":content_input}
@@ -215,7 +236,11 @@ while True: #第一层循环，用户提要求
             if(state_lm == False):
                 print("有bug 崩了")
                 break
-            content_input = input("Planning:你看看当前计划如何，纯语言就可以哈: ") #获得用户对plan对回答
+            # content_input = input("Planning:你看看当前计划如何，纯语言就可以哈: ") #获得用户对plan对回答
+            if headless:
+                content_input = "ok"
+            else:
+                content_input = input("Planning:你看看当前计划如何，纯语言就可以哈: ")            
             messages.append({"role": "user", "content": content_input+"指令部分（不需要回复）：根据用户的完善进一步给出计划，如果用户认为当前计划可以执行，那你在你的下一步回答中要包括````plan-finish```` 以及当你输出 plan-finish 时，不要同时输出任何 bash-action 代码块。plan-finish 的回答只包含 plan-finish 标记本身。以及你绝对不能自行输出 plan-finish。只有当用户的消息中明确包含'确认'、'可以'、'ok'等同意词时，你才能在下一条回复中输出 plan-finish。否则你必须等待用户反馈。"})
             if(cnt_plan>20):
                 print("Plan 崩了，回家咯，直接继续")
@@ -226,7 +251,7 @@ while True: #第一层循环，用户提要求
         messages.append({"role":"user","content":"我提的你要直接做的任务:"+content_input})
     messages.append({"role": "assistant", "content": "开始执行你的代码吧"})
     cnt = 0
-    while True:
+    while True: # EXECUTION LOOP
         cnt+=1
         
         if cnt>30:
@@ -277,6 +302,11 @@ while True: #第一层循环，用户提要求
             messages.append({"role": "user", "content": str(e)})        
             save_chat(messages)
         
+    if headless:
+        import subprocess
+        result = subprocess.run("git diff", shell = True, capture_output = True, text = True)
+        with open("patch.txt","w") as f:
+            f.write(result.stdout)
+        break
         
-        
-        
+    
