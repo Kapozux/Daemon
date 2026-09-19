@@ -254,8 +254,8 @@ while True: #第一层循环，用户提要求
     while True: # EXECUTION LOOP
         cnt+=1
         
-        if cnt>30:
-            print("agent 跑了30次了,太废物了没完成退出了")
+        if cnt>50:
+            print("agent 跑了50次了,太废物了没完成退出了")
             messages.append({"role": "assistant", "content": "你任务没完成(10轮)强制退出了"})  # remember what the LM said
             save_chat(messages)
             break
@@ -277,7 +277,8 @@ while True: #第一层循环，用户提要求
             if action == "exit":
                 break
             if action == "":
-                break
+                messages.append({"role": "assistant", "content": "此时无可执行内容(bash-action)请给出具体指令"})
+                continue
             output = execute_action(action)
             split_output = output.split("\n")
             filter_output=""
