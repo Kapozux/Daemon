@@ -7,6 +7,9 @@ import re
 import subprocess
 import os
 
+class NonterminatingException(RuntimeError): ...
+class OurTimeoutError(NonterminatingException): ...
+
 
 env_vars = {
     "PAGER": "cat",

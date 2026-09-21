@@ -6,7 +6,7 @@ from datetime import datetime
 from actions import parse_action,execute_action,parse_plan_finished,parse_plan_needed
 from llm import compression,query_lm
 from chat_export import save_chat,c_time
-
+from actions import NonterminatingException, OurTimeoutError
 
 
 
@@ -48,8 +48,6 @@ if(os.path.exists("DAEMON.md")):
         content_d = f.read()
     messages.append({"role":"system","content":"这个是你在这项目里应该做什么，应该怎么干，有什么要注意，有什么初始信息的文件，需要仔细理解"+content_d})
     save_chat(messages)
-class NonterminatingException(RuntimeError): ...
-class OurTimeoutError(NonterminatingException): ...
 
 
 
@@ -169,7 +167,7 @@ while True: #第一层循环，用户提要求
                 else:
                     filter_output+=x
                     filter_output+="\n"
-            if len(filter_output > 4000):
+            if len(filter_output) > 4000:
                 filter_output = filter_output[:2000] + "\n....(省略中间部分)...\n" + filter_output[-2000:]
             if filter_output == "":
                 print("命令执行成功，无输出")
