@@ -23,12 +23,13 @@ def save_chat(messages): #对聊天记录做导出
     temp = ""
     for i in range(len(messages)):
         if(messages[i]["role"]!="system"):
+            time = messages[i].get("time","")
             temp += "## "
             temp += (messages[i]["role"])
             temp += "  "
-            temp += messages[i]["content"][-27:]
+            temp += " (" + time +" )"
             temp += ":\n"
-            temp += messages[i]["content"][:-27]
+            temp += messages[i]["content"]
             temp += "\n"
             temp += "---"
             temp += "\n"
