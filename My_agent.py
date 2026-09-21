@@ -120,13 +120,13 @@ while True: #第一层循环，用户提要求
             if(cnt_plan>20):
                 print("Plan 崩了，回家咯，直接继续")
                 curr_time = c_time()
-                messages.append({"role": "assistant", "content": "目前planning结束（由于plan次数太多)，结束了"+curr_time})
+                messages.append({"role": "user", "content": "目前planning结束（由于plan次数太多)，结束了"+curr_time})
                 break
             cnt_plan+=1
     else:
         curr_time = c_time()
         messages.append({"role":"user","content":"我提的你要直接做的任务:"+content_input+curr_time})
-    messages.append({"role": "assistant", "content": "开始执行你的代码吧"})
+    messages.append({"role": "user", "content": "开始执行你的代码吧"})
     cnt = 0
     while True: # EXECUTION LOOP
         cnt+=1
@@ -134,7 +134,7 @@ while True: #第一层循环，用户提要求
         if cnt>50:
             print("agent 跑了50次了,太废物了没完成退出了")
             curr_time = c_time()
-            messages.append({"role": "assistant", "content": "你任务没完成(10轮)强制退出了"+curr_time})  # remember what the LM said
+            messages.append({"role": "user", "content": "你任务没完成(10轮)强制退出了"+curr_time})  # remember what the LM said
             save_chat(messages)
             break
         
@@ -156,7 +156,7 @@ while True: #第一层循环，用户提要求
                 break
             if action == "":
                 curr_time = c_time()
-                messages.append({"role": "assistant", "content": "此时无可执行内容(bash-action)请给出具体指令"+curr_time})
+                messages.append({"role": "user", "content": "此时无可执行内容(bash-action)请给出具体指令"+curr_time})
                 continue
             output = execute_action(action)
             split_output = output.split("\n")
