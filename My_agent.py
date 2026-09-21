@@ -35,9 +35,13 @@ client_ds = OpenAI(
 )
 content_input = ""
 
+with open("system_prompt.txt","r") as f:
+    system_prompt = f.read()
+
+
 messages = [{
     "role": "system", 
-    "content": "你是一个代码编写的agent, 你需要根据用户的初步指令去是否选择计划而去完成目标，并且根据你代码出现的错误进行自我修正知道完成用户目标。如果你需要跑一个指令，请用以下方式包装（一次回答只给一个！）： ```bash-action\n<command>\n```. 如果你认为任务已经完成，请运行exit 指令（不要陷入死循环）。 记住，只做符合任务目的的一切行动，不许经过用户同意后擅自查看，修改，创建新文件。当程序运行成功且输出符合预期时，必须立即运行 exit 命令，不要再做额外的验证或优化。目前agent的步骤分为三个：1. listening stage 2. plan stage 3. Execution and correction stage  Plan的时候只说计划，不给代码。 Plan的时候用户说ok，说确认才给finished.，没说的时候不可以给，不可以给计划的时候同时给finish"}]
+    "content": system_prompt}]
 
 if(os.path.exists("DAEMON.md")):
     with open("DAEMON.md","r") as f:
@@ -80,7 +84,7 @@ while True: #第一层循环，用户提要求
     else:
         content_input = input("请输入你的指令，纯语言就可以哈：")
     routing_messages = [
-        {"role":"system","content":"你只需要判断用户的任务是否需要先做计划。回复只能是plan-needed 或 plan-unwanted 其中一个词。 不允许任何其他内容。 需要多步骤、写代码、创建文件的任务回复 plan-needed。查看文件、简单查询回复 plan-unwanted。"},
+        {"role":"system","content":"你只需要判断用户的任务是否需要先做计划。 回复只能是plan-needed 或 plan-unwanted 其中一个词。  不允许任何其他内容。  需要用户确认方案再动手的任务输出plan-needed。可以直接开始做的输出plan-unwanted"},
         {"role":"user","content":content_input}
     ]
     lm_output, _, _ = query_lm(routing_messages) # 请求模型个旁枝看看要不要plan
@@ -102,9 +106,9 @@ while True: #第一层循环，用户提要求
             messages.append({"role": "assistant", "content": lm_output+curr_time})
             if(parse_plan_finished(lm_output)):
                 break
-            if(token_amount_temp>256000*0.8):
-                messages = compression(messages)
-                continue
+            if(token_amount_temp>50000):
+                messages = compression(messages,content_input)
+                continue    
             if(state_lm == False):
                 print("有bug 崩了")
                 break
@@ -139,8 +143,8 @@ while True: #第一层循环，用户提要求
         try:
             token_amount_temp = 0
             lm_output,token_amount_temp,state_lm = query_lm(messages)
-            if(token_amount_temp>256000*0.8):
-                messages = compression(messages)
+            if(token_amount_temp>50000):
+                messages = compression(messages,content_input)
                 continue
             if(state_lm == False):
                 print("有bug 崩了")
@@ -165,7 +169,8 @@ while True: #第一层循环，用户提要求
                 else:
                     filter_output+=x
                     filter_output+="\n"
-
+            if len(filter_output > 4000):
+                filter_output = filter_output[:2000] + "\n....(省略中间部分)...\n" + filter_output[-2000:]
             if filter_output == "":
                 print("命令执行成功，无输出")
                 curr_time = c_time()
