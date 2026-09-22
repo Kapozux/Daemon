@@ -23,13 +23,20 @@ env_vars = {
 def handle_read(command):
     parts = command.split() # 按空格拆成多个string的list ["xxx", "aaaa"]
     filename= parts[1]
-    line_range = parts[2]
+
+    if len(parts) == 4:
+        # read file.py 10 20 空格的情况
+        start, end = int(parts[2]), int(parts[3])
+    elif "-" in parts[2]:
+        # read file.py 10-20 
+        start,end = parts[2].split("-")
+        start,end = int(start),int(end)
+    else:
+        return "请重新给出合理的bash指令。 目前无法匹配"
 
     with open(filename,"r") as f:
-        lines = f.readlines() # 返回一个列表，索引对应不同行
-
-    start,end = line_range.split("-")
-    start,end = int(start),int(end)
+        lines = f.readlines() # 返回一个列表，索引对应不同行    
+    
     result = lines[start-1:end]
     return "".join(result)
 
@@ -41,11 +48,16 @@ def handle_write(command):
     specific_line = parts[2]
     new_content = parts[3]
 
+    if not os.path.exists(filename):
+
+        with open(filename,"w") as f: #纯没有文件
+            f.write(new_content + "\n")
+        return "新文件已创建"
+
     with open(filename,"r") as f:
         lines = f.readlines()
 
     lines[int(specific_line)-1] =  new_content + "\n" #将读出来的lines 然后根据命令的行数修改
-
     with open(filename, "w") as f:
         f.writelines(lines)
     return "已修改成功"
