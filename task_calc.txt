@@ -1,9 +1,0 @@
-编写一个计算器程序 calculator.py，要求：
-1. 实现一个 Calculator 类，包含以下方法：
-   - add(a, b): 返回 a + b
-   - sub(a, b): 返回 a - b
-   - mul(a, b): 返回 a * b
-   - div(a, b): 返回 a / b，当 b 为 0 时抛出 ValueError('division by zero')
-2. 文件末尾加 if __name__ == '__main__': 简单演示各方法。
-3. 代码要简洁、有 docstring。
-请直接输出并写入 calculator.py 文件。
