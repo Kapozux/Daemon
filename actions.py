@@ -86,7 +86,7 @@ def parse_action(lm_output: str) -> str:
 
 
 
-DANGEROUS = ["rm -rf", "rm -r","git push --force","mkfs", "> /dev/"]
+DANGEROUS = ["rm -rf", "rm -r","git push --force","mkfs", "> /dev/","My_agent.py","actions.py","llm.py","chat_export.py","system_prompt.txt",".env"]
 def execute_action(command: str) -> str: #本地python -> bash执行指令
     #执行，得到结果
     for d in DANGEROUS:
