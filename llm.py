@@ -1,8 +1,11 @@
 from openai import OpenAI
 from dotenv import load_dotenv
+from rich.console import Console
+from rich.spinner import Spinner
+from rich.live import Live
 
 
-
+console = Console()
 import os
 
 
@@ -54,26 +57,33 @@ def query_lm(messages,isCompression=False,current_model = "deepseek"):
     client, model_name = MODELS[current_model]
     while True:
         try:
-            
+            live = Live(Spinner("star", text="[bold cyan]Thinking...[/bold cyan]"), console=console)
+            live.start()
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
                 stream = True
             )   
             full_response = ""
-            
+            thinking = True
             for chunk in response:
                 if chunk.choices[0].delta.content:
+                    if thinking:
+                        live.stop()
+                        thinking = False
                     content = chunk.choices[0].delta.content
                     if(isCompression==False):
-                        print(content,end="",flush=True)
+                        console.print(content, end="",highlight=False)
                     full_response += content
 
                 #token_amount = chunk.choices[0].usage["total_token"]
                 if(hasattr(chunk,"usage")and (chunk.usage is not None)):
                     token_amount = chunk.usage.total_tokens
-                if hasattr(chunk.choices[0].delta,'reasoning_content') and chunk.choices[0].delta.reasoning_content: #如果在思考的话就输出....
-                    print(".",end="",flush=True)
+
+            if thinking:
+                live.stop()
+
+
             if(isCompression==False):
                 print()
             
