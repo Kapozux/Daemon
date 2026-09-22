@@ -19,6 +19,62 @@ env_vars = {
     "TQDM_DISABLE": "1",
 }
 
+
+def handle_read(command):
+    parts = command.split() # 按空格拆成多个string的list ["xxx", "aaaa"]
+    filename= parts[1]
+    line_range = parts[2]
+
+    with open(filename,"r") as f:
+        lines = f.readlines() # 返回一个列表，索引对应不同行
+
+    start,end = line_range.split("-")
+    start,end = int(start),int(end)
+    result = lines[start-1:end]
+    return "".join(result)
+
+
+
+def handle_write(command):
+    parts = command.split(maxsplit=3) # 前3个token是命令/文件/行号，剩余为内容(可含空格)
+    filename = parts[1]
+    specific_line = parts[2]
+    new_content = parts[3]
+
+    with open(filename,"r") as f:
+        lines = f.readlines()
+
+    lines[int(specific_line)-1] =  new_content + "\n" #将读出来的lines 然后根据命令的行数修改
+
+    with open(filename, "w") as f:
+        f.writelines(lines)
+    return "已修改成功"
+
+def handle_search(command):
+    # command: "search error ./src"
+    parts = command.split(maxsplit=2) # keyword 后的剩余全部作为目录(可含空格)
+    keyword = parts[1]
+    directory = parts[2] if len(parts) > 2 else "."
+
+    results = ""
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            filepath = os.path.join(root,file)
+            if not os.path.isfile(filepath):
+                continue
+            try:
+                with open(filepath,"r", encoding="utf-8", errors="replace") as f:
+                    for i,line in enumerate(f.readlines()):
+                        if keyword in line:
+                            results += f"{filepath}:{i+1}: {line}"
+            except (OSError, PermissionError):
+                continue
+
+    return results
+
+
+
+
 def parse_action(lm_output: str) -> str:
     #找要干啥的指令
     matches = re.findall(
@@ -44,6 +100,14 @@ def execute_action(command: str) -> str: #本地python -> bash执行指令
                 else:
                     print("输入格式错误")
     try:
+        if command.startswith("read "):
+            return handle_read(command)
+        if command.startswith("write "):
+            return handle_write(command)
+        if command.startswith("search "):
+            return handle_search(command)
+
+
         result = subprocess.run(
             command,
             shell=True,
