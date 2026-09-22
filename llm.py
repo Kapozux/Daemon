@@ -25,6 +25,13 @@ client_ds = OpenAI(
 )
 
 
+MODELS = {
+    "deepseek":(client_ds,"deepseek-chat"),
+    "kimi":(client,"kimi-k2.7-code"),
+}
+
+ #默认
+
 
 def compression(messages, original_task): # 压缩上下文（对message做处理
 
@@ -39,16 +46,17 @@ def compression(messages, original_task): # 压缩上下文（对message做处�
    return new_messages
 
 
-def query_lm(messages,isCompression=False):
+def query_lm(messages,isCompression=False,current_model = "deepseek"):
     cnt = 1
     state = True
     full_response = ""
     token_amount=0
+    client, model_name = MODELS[current_model]
     while True:
         try:
             
-            response = client_ds.chat.completions.create(
-                model="deepseek-chat",
+            response = client.chat.completions.create(
+                model=model_name,
                 messages=messages,
                 stream = True
             )   

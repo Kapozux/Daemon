@@ -24,15 +24,15 @@ load_dotenv()
 # print(os.environ.get("MOONSHOT_API_KEY"))
 
 
-client = OpenAI(
-    api_key=(os.environ["MOONSHOT_API_KEY"]), #用来自虚拟环境... 的apikey
-    base_url="https://api.moonshot.cn/v1"
-)
+# client = OpenAI(
+#     api_key=(os.environ["MOONSHOT_API_KEY"]), #用来自虚拟环境... 的apikey
+#     base_url="https://api.moonshot.cn/v1"
+# )
 
-client_ds = OpenAI(
-    api_key=(os.environ["DEEPSEEK_API_KEY"]),
-    base_url="https://api.deepseek.com"
-)
+# client_ds = OpenAI(
+#     api_key=(os.environ["DEEPSEEK_API_KEY"]),
+#     base_url="https://api.deepseek.com"
+# )
 content_input = ""
 
 with open("system_prompt.txt","r") as f:
@@ -78,16 +78,27 @@ if len(sys.argv) > 1:
 
 # AGENT LOOP
 while True: #第一层循环，用户提要求
+    current_model = "deepseek"
     # content_input = input("请输入你的指令，纯语言就可以哈: ")
     if headless:
         content_input = task_content
     else:
         content_input = input("请输入你的指令，纯语言就可以哈：")
+
+    switched = False
+    for name in ["deepseek","kimi"]:
+        if name in content_input.lower():
+            current_model = name
+            print(f"已切换到 {current_model}")
+            switched = True
+            break
+    if switched:
+        continue    
     routing_messages = [
         {"role":"system","content":"你只需要判断用户的任务是否需要先做计划。 回复只能是plan-needed 或 plan-unwanted 其中一个词。  不允许任何其他内容。  需要用户确认方案再动手的任务输出plan-needed。可以直接开始做的输出plan-unwanted"},
         {"role":"user","content":content_input,"time":c_time()}
     ]
-    lm_output, _, _ = query_lm(routing_messages) # 请求模型个旁枝看看要不要plan
+    lm_output, _, _ = query_lm(routing_messages,current_model = current_model) # 请求模型个旁枝看看要不要plan
 
     # messages.append({"role": "user", "content": content_input+"你的回复只能包含 plan-needed 或 plan-unwanted 两个词之一，不允许输出任何其他内容"})
     # save_chat(messages)
@@ -101,7 +112,7 @@ while True: #第一层循环，用户提要求
         cnt_plan=0
         while True: # PLAN LOOP
             token_amount_temp = 0
-            lm_output,token_amount_temp,state_lm = query_lm(messages) # 拿一个回答
+            lm_output,token_amount_temp,state_lm = query_lm(messages,current_model = current_model) # 拿一个回答
             curr_time = c_time()
             messages.append({"role": "assistant", "content": lm_output,"time":c_time()})
             if(parse_plan_finished(lm_output)):
@@ -118,7 +129,7 @@ while True: #第一层循环，用户提要求
             else:
                 content_input = input("Planning:你看看当前计划如何，纯语言就可以哈: ")           
             curr_time = c_time() 
-            messages.append({"role": "user", "content": content_input+"指令部分（不需要回复）：根据用户的完善进一步给出计划，如果用户认为当前计划可以执行，那你在你的下一步回答中要包括````plan-finish```` 以及当你输出 plan-finish 时，不要同时输出任何 bash-action 代码块。plan-finish 的回答只包含 plan-finish 标记本身。以及你绝对不能自行输出 plan-finish。只有当用户的消息中明确包含'确认'、'可以'、'ok'等同意词时，你才能在下一条回复中输出 plan-finish。否则你必须等待用户反馈。","time":c_time()})
+            messages.append({"role": "user", "content": content_input+"指令部分（不需要回复）：根据用户的完善进一步给出计划，如果用户认为当前计划可以执行，那你在你的下一步回答中要包括````plan-finish```` 以及当你输出 plan-finish 时，不要同时输出任何 bash-action 代码块。plan-finish 的回答只包含 plan-finish 标记本身。以及你绝对不能自行输出 plan-finish（不许说什么下一行可以输出plan-finis）。只有当用户的消息中明确包含'确认'、'可以'、'ok'等同意词时，你才能在下一条回复中输出 plan-finish。否则你必须等待用户反馈。","time":c_time()})
             if(cnt_plan>20):
                 print("Plan 崩了，回家咯，直接继续")
                 curr_time = c_time()
@@ -143,7 +154,7 @@ while True: #第一层循环，用户提要求
         
         try:
             token_amount_temp = 0
-            lm_output,token_amount_temp,state_lm = query_lm(messages)
+            lm_output,token_amount_temp,state_lm = query_lm(messages,current_model = current_model)
             if(token_amount_temp>50000):
                 messages = compression(messages,content_input)
                 continue
@@ -155,8 +166,15 @@ while True: #第一层循环，用户提要求
             curr_time = c_time()
             messages.append({"role": "assistant", "content": lm_output,"time":c_time()})  # remember what the LM said
             save_chat(messages)
-            if action == "exit":
+
+
+            if action == "exit-verified":
                 break
+
+
+            if action == "exit":
+                # 不许立刻break, 反而请求进行主动测试
+                messages.append({"role":"user","content":"完成任务后不要直接exit, 先跑相关测试验证，确认通过后才可以输出exit-verified","time":c_time()})
             if action == "":
                 empty_cnt +=1
                 if empty_cnt >= 3:
