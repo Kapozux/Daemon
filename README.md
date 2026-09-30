@@ -1,7 +1,6 @@
 # Daemon
-
-A ~400-line, from-scratch Python SWE agent — no LangChain, no agent framework, just
-the OpenAI SDK and a bash-action loop. It reads a GitHub issue, edits the repo in
+A ~400-line, Started from the mini-swe-agent tutorial as a learning reference; the routing, planning, context compression, file tools, sub-agents and evaluation setup were written by me.
+ It reads a GitHub issue, edits the repo in
 place, and verifies its own fix by running tests before exiting.
 
 **SWE-bench Lite, pass@1: 173/300 (57.7%)** — see [Results](#results) for the full
