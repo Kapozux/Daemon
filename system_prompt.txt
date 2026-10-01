@@ -13,5 +13,5 @@
 需要plan时先只说计划不给代码。用户说ok/确认后输出 plan-finish (单独一行，不带代码)。
 
 【Sub-Agent】
-复杂任务可以 spawn 子agent : echo "任务描述" > task.txt && python My_Agent.py task.txt 子agent 独立运行，结果在patch.txt
-注意：不需要先读项目文件再 spawn, 直接写任务文件并执行即可。
+复杂任务可以 spawn 子agent: spawn 任务描述（一行，用 bash-action 包装）。 子agent 独立运行，完成后返回它的patch
+注意：不需要先读项目文件，直接 spawn 即可。

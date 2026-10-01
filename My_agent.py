@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 # 个人文件
 from actions import parse_action,execute_action,parse_plan_finished,parse_plan_needed
-from llm import compression,query_lm
+from llm import compression,query_lm, MODELS
 from chat_export import save_chat,c_time
 from actions import NonterminatingException, OurTimeoutError
 
@@ -35,9 +35,12 @@ load_dotenv()
 # )
 content_input = ""
 
-with open("system_prompt.txt","r") as f:
-    system_prompt = f.read()
+# with open("system_prompt.txt","r") as f:
+#     system_prompt = f.read()
 
+AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(AGENT_DIR,"system_prompt.txt"),"r") as f:
+    system_prompt = f.read()
 
 messages = [{
     "role": "system", 
@@ -75,25 +78,21 @@ if len(sys.argv) > 1:
 
 
 
-
+current_model = "deepseek-pro"  
 # AGENT LOOP
 while True: #第一层循环，用户提要求
-    current_model = "deepseek"
+    
     # content_input = input("请输入你的指令，纯语言就可以哈: ")
     if headless:
         content_input = task_content
     else:
         content_input = input("请输入你的指令，纯语言就可以哈：")
-
-    switched = False
-    for name in ["deepseek","kimi"]:
-        if name in content_input.lower():
-            current_model = name
-            print(f"已切换到 {current_model}")
-            switched = True
-            break
-    if switched:
-        continue    
+        cmd = content_input.strip().lower()
+        if cmd in MODELS:
+            current_model = cmd
+            print(f"已切换到{current_model}")
+            continue
+            
     routing_messages = [
         {"role":"system","content":"你只需要判断用户的任务是否需要先做计划。 回复只能是plan-needed 或 plan-unwanted 其中一个词。  不允许任何其他内容。  需要用户确认方案再动手的任务输出plan-needed。可以直接开始做的输出plan-unwanted"},
         {"role":"user","content":content_input,"time":c_time()}

@@ -158,7 +158,7 @@ pip install openai python-dotenv rich
 
 # Configure
 cp .env.example .env
-# Add your DEEPSEEK_API_KEY and MOONSHOT_API_KEY
+# Add your DEEPSEEK_API_KEY and MOONSHOT_API_KEY (both are required, even if you only use one model)
 
 # Run
 python My_agent.py

@@ -85,6 +85,30 @@ def handle_search(command):
     return results
 
 
+AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def handle_spawn(command):
+    task = command[len("spawn "):].strip()
+    with open("task.txt","w") as f:
+        f.write(task)
+    if os.path.exists("patch.txt"):
+        os.remove("patch.txt")
+    try:
+        subprocess.run(
+            [sys.executable, os.path.join(AGENT_DIR, "My_agent.py"), "task.txt"],
+            text = True, stdout = subprocess.DEVNULL , stderr = subprocess.STDOUT,
+            timeout = 1800,
+        )
+    except subprocess.TimeoutExpired:
+        return "子agent 超时（30分钟）被终止"
+    if not os.path.exists("patch.txt"):
+        return "子agent未产生patch.txt"
+    with open("patch.txt") as f:
+        return "子agent完成，patch 如下：\n" + f.read()
+    
+
+
+
 
 
 def parse_action(lm_output: str) -> str:
@@ -101,10 +125,15 @@ def parse_action(lm_output: str) -> str:
 DANGEROUS = ["rm -rf", "rm -r","git push --force","mkfs", "> /dev/","My_agent.py","actions.py","llm.py","chat_export.py","system_prompt.txt",".env"]
 def execute_action(command: str) -> str: #本地python -> bash执行指令
     #执行，得到结果
+    if command.startswith("spawn "):
+        return handle_spawn(command)
     for d in DANGEROUS:
         if d in command:
             while True:
-                user_input = input("目前的代码中有存在对于危险指令，回复y/n是否确认执行？")
+                try :
+                    user_input = input("目前的代码中有存在对于危险指令，回复y/n是否确认执行？")
+                except EOFError:
+                    return "headless模式无法确认危险指令，已拒绝，请换一种做法"
                 if(user_input =="y"):
                     break
                 elif(user_input =="n"):
@@ -157,6 +186,7 @@ def parse_plan_needed(lm_output):
         return True
     elif("plan-unwanted" in lm_output):
         return False
+
 
 
 

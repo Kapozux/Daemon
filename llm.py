@@ -29,8 +29,10 @@ client_ds = OpenAI(
 
 
 MODELS = {
-    "deepseek":(client_ds,"deepseek-chat"),
+    "deepseek":(client_ds,"deepseek-flash"),
+    "deepseek-pro":(client_ds,"deepseek-v4-pro"),
     "kimi":(client,"kimi-k2.7-code"),
+
 }
 
  #默认
@@ -87,7 +89,7 @@ def query_lm(messages,isCompression=False,current_model = "deepseek"):
             if(isCompression==False):
                 print()
             
-            return full_response, token_amount,state
+            return full_response, token_amount,True
         
         except Exception as e:
             print(f"API调用失败: {e}")
