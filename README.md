@@ -43,14 +43,19 @@ heavily, keep the human's original wording, keep the model's own reasoning — a
 restarts the message list from that summary plus the original task, so a long
 session doesn't lose the actual goal.
 
-**Sub-agents.** The system prompt tells the model it can delegate: write a task
-file and run `python My_Agent.py task.txt`, which recurses into the same headless
-mode described below and hands back a `patch.txt`. There's no coordination beyond
-that — a sub-agent is just another instance of the same loop.
+**Sub-agents.** The system prompt tells the model it can delegate by emitting a
+`spawn <task description>` action. `actions.py` writes the description to `task.txt`
+and runs `My_agent.py task.txt` by absolute path, so it works from whatever directory
+the agent is operating in. The sub-agent runs in the same headless mode described
+below, and its `patch.txt` is returned to the parent as the action's output (30-minute
+timeout). There's no coordination beyond that — a sub-agent is just another instance
+of the same loop.
 
-**Backends.** `llm.py` streams from either DeepSeek (`deepseek-chat`) or Kimi
+**Backends.** `llm.py` streams from either DeepSeek (`deepseek-flash`, or
+`deepseek-v4-pro` under the name `deepseek-pro`, the default) or Kimi
 (`kimi-k2.7-code`) through the OpenAI SDK's chat-completions interface, switchable
-mid-session by typing the model's name. `query_lm` retries up to 5 times on any
+mid-session by entering just the model's name (`deepseek`, `deepseek-pro`, `kimi`)
+as the whole instruction. `query_lm` retries up to 5 times on any
 API exception (this is also where a DeepSeek-specific bug lived: DeepSeek's stream
 emits a `usage` field that Moonshot's doesn't, and reading it unconditionally used
 to crash every call the moment the backend was switched to DeepSeek — fixed by
@@ -62,9 +67,12 @@ guarding on `hasattr(chunk, "usage")`).
 python My_agent.py task.txt
 ```
 
-reads the issue text from `task.txt`, runs the normal execution loop non-interactively
-(no planning stage, no `input()` prompts), and on exit runs `git diff` into
-`patch.txt`. For SWE-bench, an external harness drops the four agent files
+reads the issue text from `task.txt`, runs the same routing → plan → execution loop
+non-interactively, and on exit runs `git diff` into `patch.txt`. Routing still runs;
+if it picks `plan-needed`, every plan is auto-approved with "ok". Commands that
+match a destructive pattern are rejected automatically instead of waiting for `y/n`,
+and the model is told to try another approach. Model switching is disabled, so an
+issue that mentions "deepseek" or "kimi" is treated as normal text. For SWE-bench, an external harness drops the four agent files
 unmodified into each instance's official container, runs this command against
 `/testbed`, and collects the resulting patch — the agent code itself has no
 SWE-bench-specific logic.
@@ -119,12 +127,10 @@ a spread wide enough that no single 30-instance run should be trusted on its own
 
 ## Known limitations
 
-- **The dangerous-command confirmation blocks in headless mode.** If the model's
-  action matches one of the destructive patterns, `execute_action` calls Python's
-  `input()` — which has nothing to read from inside a non-interactive container and
-  will hang until the harness's timeout kills the run. This has not been observed
-  in the SWE-bench Lite run above, but it's a real failure mode for any task that
-  legitimately needs e.g. `git push --force`.
+- **Destructive commands are always refused in headless mode.** There's nobody to
+  answer the `y/n` prompt, so a matching command is rejected outright. That makes a
+  headless run safe, but it also blocks tasks that really need e.g.
+  `git push --force` or editing a file named `llm.py`.
 - **120s per shell command.** Long-running test suites or builds that exceed this
   get killed and reported back as a timeout, not a real result.
 - **Single-pass context compression.** When a session exceeds the token threshold,
